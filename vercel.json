@@ -4,12 +4,55 @@
         {
             "src": "backend/server.js",
             "use": "@vercel/node"
+<<<<<<< HEAD
+=======
+        },
+        {
+            "src": "frontend/package.json",
+            "use": "@vercel/static-build",
+            "config": {
+                "buildCommand": "cd frontend && npm install && npm run build",
+                "outputDirectory": "frontend/dist"
+            }
+        },
+        {
+            "src": "admin/package.json",
+            "use": "@vercel/static-build",
+            "config": {
+                "buildCommand": "cd admin && npm install && npm run build",
+                "outputDirectory": "admin/dist"
+            }
+>>>>>>> 35891ad1ea9fbaf08495cb589c66b4363d032b4a
         }
     ],
     "routes": [
         {
+<<<<<<< HEAD
             "src": "/(.*)",
             "dest": "backend/server.js"
         }
     ]
 } 
+=======
+            "src": "/api/(.*)",
+            "dest": "/backend/server.js"
+        },
+        {
+            "src": "/admin/(.*)",
+            "dest": "/admin/dist/$1"
+        },
+        {
+            "src": "/admin",
+            "dest": "/admin/dist/index.html"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/frontend/dist/$1"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/frontend/dist/index.html"
+        }
+    ]
+} 
+>>>>>>> 35891ad1ea9fbaf08495cb589c66b4363d032b4a
