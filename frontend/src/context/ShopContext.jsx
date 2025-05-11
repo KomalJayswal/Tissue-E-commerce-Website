@@ -2,6 +2,7 @@ import { createContext, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import axios from 'axios'
+import { shopifyConfig } from '../config/shopify';
 
 export const ShopContext = createContext();
 
@@ -110,19 +111,84 @@ const ShopContextProvider = (props) => {
 
     const getProductsData = async () => {
         try {
+            const query = `
+                {
+                    products(first: 50) {
+                        edges {
+                            node {
+                                id
+                                title
+                                description
+                                priceRange {
+                                    minVariantPrice {
+                                        amount
+                                    }
+                                }
+                                images(first: 1) {
+                                    edges {
+                                        node {
+                                            url
+                                        }
+                                    }
+                                }
+                                variants(first: 10) {
+                                    edges {
+                                        node {
+                                            id
+                                            title
+                                            price {
+                                                amount
+                                            }
+                                        }
+                                    }
+                                }
+                                productType
+                                vendor
+                                createdAt
+                            }
+                        }
+                    }
+                }
+            `;
 
-            const response = await axios.get(backendUrl + '/api/product/list')
-            if (response.data.success) {
-                setProducts(response.data.products.reverse())
+            const response = await fetch(`https://${shopifyConfig.storeUrl}/api/${shopifyConfig.apiVersion}/graphql.json`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Shopify-Storefront-Access-Token': shopifyConfig.storefrontAccessToken
+                },
+                body: JSON.stringify({ query })
+            });
+
+            const data = await response.json();
+            
+            if (data.data) {
+                const transformedProducts = data.data.products.edges.map(({ node }) => {
+                    const sizes = node.variants.edges.map(({ node: variant }) => variant.title);
+                    
+                    return {
+                        _id: node.id.split('/').pop(),
+                        name: node.title,
+                        description: node.description || '',
+                        price: parseFloat(node.priceRange.minVariantPrice.amount),
+                        image: node.images.edges.map(({ node: image }) => image.url),
+                        category: node.productType || 'Uncategorized',
+                        subCategory: node.vendor || 'Uncategorized',
+                        sizes: sizes || [],
+                        bestseller: false,
+                        date: new Date(node.createdAt).getTime()
+                    };
+                });
+
+                setProducts(transformedProducts.reverse());
             } else {
-                toast.error(response.data.message)
+                toast.error('Failed to fetch products');
             }
-
         } catch (error) {
-            console.log(error)
-            toast.error(error.message)
+            console.log(error);
+            toast.error(error.message);
         }
-    }
+    };
 
     const getUserCart = async ( token ) => {
         try {
