@@ -1,12 +1,19 @@
-import { createContext, useEffect, useState } from "react";
+import { createContext, useEffect, useState, useContext } from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import axios from 'axios'
 
-export const ShopContext = createContext();
+const ShopContext = createContext();
 
-const ShopContextProvider = (props) => {
+export const useShop = () => {
+    const context = useContext(ShopContext);
+    if (!context) {
+        throw new Error('useShop must be used within a ShopProvider');
+    }
+    return context;
+};
 
+export const ShopProvider = ({ children }) => {
     const currency = '$';
     const delivery_fee = 10;
     const backendUrl = import.meta.env.VITE_BACKEND_URL
@@ -16,7 +23,6 @@ const ShopContextProvider = (props) => {
     const [products, setProducts] = useState([]);
     const [token, setToken] = useState('')
     const navigate = useNavigate();
-
 
     const addToCart = async (itemId, size) => {
 
@@ -110,17 +116,56 @@ const ShopContextProvider = (props) => {
 
     const getProductsData = async () => {
         try {
-
-            const response = await axios.get(backendUrl + '/api/product/list')
-            if (response.data.success) {
-                setProducts(response.data.products.reverse())
-            } else {
-                toast.error(response.data.message)
+            const response = await fetch('https://0mdsbb-0w.myshopify.com/admin/api/2024-01/products.json', {
+                method: 'GET',
+                headers: {
+                    'content-type': 'application/json',
+                    'x-shopify-access-token': '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'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+            
+            const data = await response.json();
+            
+            // Transform Shopify data to match our application's format
+            const transformedProducts = data.products.map(product => {
+                // Get all size options from the product
+                const sizeOption = product.options.find(opt => 
+                    opt.name.toLowerCase() === 'size' || 
+                    opt.name.toLowerCase() === 'sizes' ||
+                    opt.name.toLowerCase().includes('size')
+                );
+    
+                // Get sizes from variants if no explicit size option exists
+                const sizesFromVariants = product.variants
+                    .map(variant => variant.option1)
+                    .filter((size, index, self) => self.indexOf(size) === index);
+    
+                // Use size option values if available, otherwise use variant sizes
+                const sizes = sizeOption ? sizeOption.values : sizesFromVariants;
+    
+                return {
+                    _id: product.id.toString(),
+                    name: product.title,
+                    description: product.body_html || '',
+                    price: parseFloat(product.variants[0]?.price || 0),
+                    image: product.images.map(img => img.src),
+                    category: product.product_type || 'Uncategorized',
+                    subCategory: product.vendor || 'Uncategorized',
+                    sizes: sizes || [],
+                    bestseller: false,
+                    date: new Date(product.created_at).getTime()
+                };
+            });
+
+            setProducts(transformedProducts.reverse());
 
         } catch (error) {
-            console.log(error)
-            toast.error(error.message)
+            console.error('Error fetching products:', error);
+            toast.error('Failed to fetch products. Please try again later.');
         }
     }
 
@@ -162,10 +207,9 @@ const ShopContextProvider = (props) => {
 
     return (
         <ShopContext.Provider value={value}>
-            {props.children}
+            {children}
         </ShopContext.Provider>
     )
-
 }
 
-export default ShopContextProvider;
+export default ShopProvider;
